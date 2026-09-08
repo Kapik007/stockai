@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockAI Polska — Analiza spółek GPW</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #6366f1;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  /* NAV */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+  .nav-logo .dot { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .nav-badge { font-size: 11px; background: rgba(16,185,129,0.15); color: var(--green); padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(16,185,129,0.3); }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-right a { color: var(--text2); text-decoration: none; font-size: 14px; transition: color 0.2s; }
+  .nav-right a:hover { color: var(--text); }
+
+  /* LAYOUT */
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 768px) { .grid2 { grid-template-columns: 1fr; } .stats-row { grid-template-columns: 1fr 1fr; } }
+
+  /* HERO */
+  .hero { text-align: center; padding: 3rem 0 2rem; }
+  .hero h1 { font-size: clamp(28px, 5vw, 48px); font-weight: 700; line-height: 1.2; margin-bottom: 1rem; }
+  .hero h1 span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { color: var(--text2); font-size: 16px; max-width: 500px; margin: 0 auto 2rem; line-height: 1.6; }
+
+  /* STATS BAR */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 2rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 12px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-val { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .stat-sub { font-size: 12px; margin-top: 2px; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .neutral { color: var(--text2); }
+
+  /* SEARCH */
+  .search-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+  .search-card h2 { font-size: 16px; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .search-card h2 .icon { color: var(--accent); }
+  .search-row { display: flex; gap: 10px; }
+  .search-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+  .search-row input:focus { border-color: var(--accent); }
+  .search-row input::placeholder { color: var(--text3); }
+  .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.2s; white-space: nowrap; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .err { color: var(--red); font-size: 13px; margin-top: 8px; display: none; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin: 1rem 0 0; border-bottom: 1px solid var(--border); }
+  .tab { background: none; border: none; color: var(--text3); font-size: 13px; font-family: inherit; padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { padding: 1.25rem 0 0; font-size: 14px; line-height: 1.7; color: var(--text2); min-height: 120px; }
+
+  /* RESULT */
+  .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .result-name { font-size: 16px; font-weight: 600; color: var(--text); }
+  .pill { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
+  .pill-green { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+  .pill-amber { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .pill-red { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .wskazniki-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .w-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .w-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .w-val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text); }
+  .thinking { display: flex; align-items: center; gap: 10px; color: var(--text3); font-size: 13px; padding: 1rem 0; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ask-btn { display: inline-block; margin-top: 1rem; background: rgba(59,130,246,0.1); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+  .ask-btn:hover { background: rgba(59,130,246,0.2); }
+
+  /* OKAZJE */
+  .okazje-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .card-header h2 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .ai-tag { font-size: 10px; font-weight: 700; background: rgba(99,102,241,0.15); color: var(--accent2); border: 1px solid rgba(99,102,241,0.3); padding: 2px 7px; border-radius: 20px; letter-spacing: 0.05em; }
+  .spolka-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+  .spolka-row:hover { background: var(--surface2); }
+  .spolka-row + .spolka-row { border-top: 1px solid var(--border); }
+  .spolka-left { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .spolka-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .spolka-sector { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .spolka-right { text-align: right; }
+  .spolka-price { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .spolka-change { font-size: 12px; font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+
+  /* CHAT */
+  .chat-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-top: 1.5rem; }
+  .chat-messages { min-height: 100px; max-height: 400px; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; }
+  .msg.user { align-self: flex-end; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border-radius: 16px 16px 4px 16px; padding: 10px 14px; font-size: 14px; }
+  .msg.ai { align-self: flex-start; background: var(--surface2); border: 1px solid var(--border); border-radius: 16px 16px 16px 4px; padding: 10px 14px; font-size: 14px; color: var(--text2); line-height: 1.6; }
+  .msg-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+  .chat-input-row input:focus { border-color: var(--accent); }
+  .chat-input-row input::placeholder { color: var(--text3); }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--border); padding: 2rem 1.5rem; text-align: center; color: var(--text3); font-size: 13px; margin-top: 3rem; }
+  footer span { color: var(--red); }
+
+  /* MOBILE */
+  @media (max-width: 600px) {
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .hero { padding: 1.5rem 0 1rem; }
+    .search-row { flex-direction: column; }
+    .wskazniki-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="dot">📈</div>
+    <span>Stock<span style="color:var(--accent)">AI</span></span>
+    <span class="nav-badge">● LIVE GPW</span>
+  </div>
+  <div class="nav-right">
+    <a href="#analiza">Analiza</a>
+    <a href="#okazje">Okazje</a>
+    <a href="#chat">Asystent AI</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="hero">
+    <h1>Analizuj spółki GPW<br><span>z pomocą sztucznej inteligencji</span></h1>
+    <p>Wpisz ticker dowolnej spółki i otrzymaj natychmiastową analizę finansową, ocenę ryzyka i rekomendację inwestycyjną.</p>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">WIG20</div>
+      <div class="stat-val" style="color:var(--green)">2 347,8</div>
+      <div class="stat-sub up">▲ +1,24% dziś</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">WIG</div>
+      <div class="stat-val" style="color:var(--green)">81 204</div>
+      <div class="stat-sub up">▲ +0,87%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Okazje AI</div>
+      <div class="stat-val" style="color:var(--accent)">4</div>
+      <div class="stat-sub neutral">spółki z potencjałem</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ropa Brent</div>
+      <div class="stat-val" style="color:var(--amber)">94,2$</div>
+      <div class="stat-sub up">▲ +2,1%</div>
+    </div>
+  </div>
+
+  <div id="analiza" class="search-card">
+    <h2><span class="icon">🔍</span> Analiza spółki</h2>
+    <div class="search-row">
+      <input type="text" id="ticker" placeholder="Wpisz ticker: DNP, PKN, KGHM, CDR, TPL, OPL..." />
+      <button class="btn" id="analyze-btn" onclick="analyzeStock()">Analizuj →</button>
+    </div>
+    <div class="err" id="err">Wpisz ticker spółki przed analizą.</div>
+
+    <div id="result-area" style="display:none">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'ai')">Ocena AI</button>
+        <button class="tab" onclick="switchTab(this,'wskazniki')">Wskaźniki</button>
+        <button class="tab" onclick="switchTab(this,'rek')">Rekomendacja</button>
+      </div>
+      <div class="tab-content" id="tab-content"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div id="okazje" class="okazje-card">
+      <div class="card-header">
+        <h2>🔥 Okazje inwestycyjne <span class="ai-tag">AI</span></h2>
+        <button class="btn-ghost" onclick="openChat('Które spółki GPW mają teraz największy potencjał wzrostu?')">Odśwież ↗</button>
+      </div>
+
+      <div id="okazje-list">
+        <div class="spolka-row" onclick="loadStock('DNP')">
+          <div class="spolka-left">
+            <div class="avatar" style="background:rgba(16,185,129,0.15);color:var(--green)">DNP</div>
+            <div><div class="spolka-name">Dino Polska <span class="ai-tag">AI Pick</span></div><div class="spolka-sector">handel detaliczny</div></div>
+          </div>
+          <div class="spolka-right"><div class="spolka-price">412,00 zł</div><div class="spolka-change up">+2,8%</div></div>
+        </div>
+        <div class="spolka-row" onclick="loadStock('PKN')">
+          <div class="spolka-left">
+            <div class="avatar" style="background:rgba(59,130,246,0.15);color:var(--accent)">PKN</div>
+            <div><div class="spolka-name">PKN Orlen <span class="ai-tag">AI Pick</span></div><div class="spolka-sector">energia / ropa</div></div>
+          </div>
+          <div class="spolka-right"><div class="spolka-price">63,40 zł</div><div class="spolka-change up">+1,4%</div></div>
+        </div>
+        <div class="spolka-row" onclick="loadStock('KGHM')">
+          <div class="spolka-left">
+            <div class="avatar" style="background:rgba(245,158,11,0.15);color:var(--amber)">KGH</div>
+            <div><div class="spolka-name">KGHM <span class="ai-tag">AI Pick</span></div><div class="spolka-sector">górnictwo / metale</div></div>
+          </div>
+          <div class="spolka-right"><div class="spolka-price">148,20 zł</div><div class="spolka-change up">+0,9%</div></div>
+        </div>
+        <div class="spolka-row" onclick="loadStock('CDR')">
+          <div class="spolka-left">
+            <div class="avatar" style="background:rgba(99,102,241,0.15);color:var(--accent2)">CDR</div>
+            <div><div class="spolka-name">CD Projekt <span class="ai-tag">AI Pick</span></div><div class="spolka-sector">technologia / gaming</div></div>
+          </div>
+          <div class="spolka-right"><div class="spolka-price">187,60 zł</div><div class="spolka-change down">−0,6%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="chat" class="chat-section">
+      <div class="card-header">
+        <h2>🤖 Asystent AI <span class="ai-tag">CLAUDE</span></h2>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg ai">
+          <div class="msg-label">🤖 StockAI</div>
+          Cześć! Jestem Twoim asystentem inwestycyjnym. Zapytaj mnie o dowolną spółkę GPW, sytuację rynkową lub strategię inwestycyjną. Na czym mogę Ci dziś pomóc?
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Zadaj pytanie o rynek, spółkę, strategię..." onkeydown="if(event.key==='Enter') sendChat()" />
+        <button class="btn" onclick="sendChat()">Wyślij</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  StockAI Polska — narzędzie edukacyjne. Nie stanowi porady inwestycyjnej. Inwestowanie wiąże się z ryzykiem utraty kapitału. <span>♥</span>
+</footer>
+
+<script>
+const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+
+const db = {
+  DNP: { name:'Dino Polska S.A.', score:'good', sector:'handel detaliczny',
+    ai:'Dino Polska wykazuje solidne fundamenty mimo presji kosztowej. Spółka systematycznie zwiększa liczbę placówek i przychody, choć wskaźniki rentowności nieznacznie spadają w trzyletnim horyzoncie. Płynność bieżąca poniżej normy (CR 0,78) wymaga monitorowania. Mocna pozycja rynkowa i model supermarketów bliskości zapewnia naturalną barierę wejścia dla konkurencji. Potencjał wzrostu: umiarkowanie wysoki.',
+    w:{ ROS:'4,51%', ROE:'17,14%', ROA:'8,22%', CR:'0,78' },
+    rek:'Utrzymaj / Rozważ zakup przy spadkach. Trwała przewaga konkurencyjna i stabilny model przychodów. Ryzyko: wzrost kosztów operacyjnych przy ekspansji sieci.' },
+  PKN: { name:'PKN Orlen S.A.', score:'ok', sector:'energia / ropa',
+    ai:'Orlen jako zintegrowany koncern energetyczny korzysta na napięciach bliskowschodnich i wysokich cenach ropy. Konsolidacja z Lotosem i PGNiG zwiększyła skalę, ale też złożoność operacyjną. Ryzyko regulacyjne i polityczne w Polsce jest czynnikiem ograniczającym wycenę.',
+    w:{ ROS:'3,2%', ROE:'11,8%', ROA:'5,9%', CR:'1,02' },
+    rek:'Neutralna. Dobry zakład na wysokie ceny ropy. Ryzyko polityczne ogranicza upside. Rozważ jako część portfela energetycznego.' },
+  KGHM: { name:'KGHM Polska Miedź S.A.', score:'ok', sector:'górnictwo / metale',
+    ai:'KGHM to globalny producent miedzi i srebra — metali kluczowych w transformacji energetycznej (EV, OZE). Ekspozycja na rosnące ceny srebra to atut. Ryzyka: rosnące koszty energii i wyniki kopalni Sierra Gorda w Chile.',
+    w:{ ROS:'5,8%', ROE:'8,4%', ROA:'4,1%', CR:'1,31' },
+    rek:'Rozważ zakup przy korekcie. Naturalny beneficjent transformacji energetycznej. Monitoruj wyniki Sierra Gorda i ceny miedzi na LME.' },
+  CDR: { name:'CD Projekt S.A.', score:'ok', sector:'gaming / technologia',
+    ai:'CD Projekt posiada globalną markę (Wiedźmin, Cyberpunk 2077), ale model biznesowy oparty na rzadkich premierach generuje znaczną zmienność przychodów między cyklami wydawniczymi. Rynek wycenia niepewność harmonogramów kolejnych tytułów.',
+    w:{ ROS:'28,1%', ROE:'15,3%', ROA:'13,6%', CR:'4,82' },
+    rek:'Spekulacyjny zakup. Wysoka rentowność gdy spółka sprzedaje gry. Główne ryzyko: nieregularność przychodów i opóźnienia premier. Odpowiednia dla inwestorów z wyższą tolerancją ryzyka.' },
+};
+
+let currentTicker = '';
+let currentTab = 'ai';
+
+function analyzeStock() {
+  const val = document.getElementById('ticker').value.trim().toUpperCase();
+  const err = document.getElementById('err');
+  if (!val) { err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  loadStock(val);
+}
+
+function loadStock(ticker) {
+  document.getElementById('ticker').value = ticker;
+  currentTicker = ticker;
+  currentTab = 'ai';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  const area = document.getElementById('result-area');
+  const content = document.getElementById('tab-content');
+  area.style.display = 'block';
+  content.innerHTML = '<div class="thinking"><div class="spinner"></div> AI analizuje spółkę ' + ticker + '...</div>';
+  area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => renderTab('ai', ticker), 1100);
+}
+
+function switchTab(btn, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentTab = tab;
+  if (currentTicker) renderTab(tab, currentTicker);
+}
+
+function renderTab(tab, ticker) {
+  const d = db[ticker];
+  const content = document.getElementById('tab-content');
+  if (!d) {
+    content.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:1rem 0">Spółka <b style="color:var(--text)">' + ticker + '</b> nie jest jeszcze w bazie. Dostępne: DNP, PKN, KGHM, CDR.<br><br>Możesz zapytać asystenta AI w czacie poniżej o dowolną spółkę GPW.</div>';
+    return;
+  }
+  const pillClass = d.score === 'good' ? 'pill-green' : d.score === 'ok' ? 'pill-amber' : 'pill-red';
+  const pillLabel = d.score === 'good' ? '✓ Solidna' : d.score === 'ok' ? '~ Umiarkowana' : '✗ Ryzykowna';
+  let html = '<div class="result-header"><span class="result-name">' + d.name + '</span><span class="pill ' + pillClass + '">' + pillLabel + '</span></div>';
+  if (tab === 'ai') {
+    html += '<p style="color:var(--text2);font-size:14px;line-height:1.7">' + d.ai + '</p>';
+    html += '<button class="ask-btn" onclick="openChat(\'Powiedz mi więcej o ' + d.name + ' — czy warto kupić akcje tej spółki?\')">Zapytaj asystenta AI o więcej →</button>';
+  } else if (tab === 'wskazniki') {
+    html += '<div class="wskazniki-grid">';
+    for (const [k,v] of Object.entries(d.w)) {
+      html += '<div class="w-box"><div class="w-label">' + k + '</div><div class="w-val">' + v + '</div></div>';
+    }
+    html += '</div>';
+    html += '<button class="ask-btn" style="margin-top:1rem" onclick="openChat(\'Zinterpretuj mi wskaźniki finansowe spółki ' + d.name + ': ROS=' + d.w.ROS + ', ROE=' + d.w.ROE + ', ROA=' + d.w.ROA + ', CR=' + d.w.CR + '\')">Interpretuj wskaźniki z AI →</button>';
+  } else {
+    html += '<p style="color:var(--text2);font-size:14px;line-height:1.7">' + d.rek + '</p>';
+    html += '<button class="ask-btn" onclick="openChat(\'Mam w portfelu: ENI, Exxon Mobil, KGHM, Orlen, Torpol, TotalEnergies. Czy warto dokupić ' + d.name + '?\')">Sprawdź dopasowanie do mojego portfela →</button>';
+  }
+  content.innerHTML = html;
+}
+
+function openChat(text) {
+  document.getElementById('chat-input').value = text;
+  document.getElementById('chat').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('chat-input').focus();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  const messages = document.getElementById('chat-messages');
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'msg user';
+  userDiv.textContent = msg;
+  messages.appendChild(userDiv);
+
+  const aiDiv = document.createElement('div');
+  aiDiv.className = 'msg ai';
+  aiDiv.innerHTML = '<div class="msg-label">🤖 StockAI</div><div class="thinking"><div class="spinner"></div> Analizuję...</div>';
+  messages.appendChild(aiDiv);
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch(CLAUDE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        system: 'Jesteś doświadczonym analitykiem giełdowym specjalizującym się w spółkach notowanych na GPW (Giełda Papierów Wartościowych w Warszawie). Udzielasz zwięzłych, konkretnych odpowiedzi po polsku. Zawsze zaznaczasz że twoje odpowiedzi mają charakter edukacyjny i nie stanowią porady inwestycyjnej. Odpowiadasz w 3-5 zdaniach.',
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || 'Przepraszam, wystąpił błąd. Spróbuj ponownie.';
+    aiDiv.innerHTML = '<div class="msg-label">🤖 StockAI</div>' + text;
+  } catch(e) {
+    aiDiv.innerHTML = '<div class="msg-label">🤖 StockAI</div><span style="color:var(--red)">Błąd połączenia z API. Sprawdź klucz API w kodzie.</span>';
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+document.getElementById('ticker').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyzeStock();
+  document.getElementById('err').style.display = 'none';
+});
+</script>
+</body>
+</html>
